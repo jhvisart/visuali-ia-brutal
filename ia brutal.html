@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>IA Brutal Viva</title>
+<style>
+body{margin:0;background:#000;overflow:hidden}
+canvas{display:block}
+</style>
+</head>
+<body>
+
+<input type="file" id="file" style="position:fixed;z-index:10">
+
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+}
+resize();
+window.onresize = resize;
+
+// AUDIO
+let audioCtx, analyser, data;
+let energy = 0;
+
+file.onchange = e=>{
+const audio = new Audio(URL.createObjectURL(e.target.files[0]));
+audioCtx = new AudioContext();
+const src = audioCtx.createMediaElementSource(audio);
+analyser = audioCtx.createAnalyser();
+src.connect(analyser);
+analyser.connect(audioCtx.destination);
+data = new Uint8Array(analyser.frequencyBinCount);
+audio.play();
+};
+
+// PARTÍCULAS
+let particles = [];
+for(let i=0;i<900;i++){
+particles.push({
+x:Math.random()*canvas.width,
+y:Math.random()*canvas.height,
+vx:0,vy:0,
+life:Math.random()*100,
+seed:Math.random()*1000
+});
+}
+
+// ESTADOS EVOLUTIVOS
+let phase = 0;
+setInterval(()=>{phase=(phase+1)%4;},8000);
+
+// MOUSE
+let mx=0,my=0;
+window.onmousemove=e=>{
+mx=e.clientX;
+my=e.clientY;
+};
+
+// ANIMACIÓN
+function animate(){
+requestAnimationFrame(animate);
+
+ctx.fillStyle="rgba(0,0,0,0.2)";
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+// AUDIO
+if(analyser){
+analyser.getByteFrequencyData(data);
+energy = data.reduce((a,b)=>a+b)/data.length;
+}
+
+// CENTRO
+let cx = canvas.width/2;
+let cy = canvas.height/2;
+
+particles.forEach(p=>{
+
+let dx = cx - p.x;
+let dy = cy - p.y;
+let dist = Math.hypot(dx,dy)+0.001;
+
+// comportamiento según fase
+if(phase===0){
+// caos inicial
+p.vx += (Math.random()-0.5)*2;
+p.vy += (Math.random()-0.5)*2;
+}
+
+if(phase===1){
+// red viva
+p.vx += dx/dist*0.1;
+p.vy += dy/dist*0.1;
+}
+
+if(phase===2){
+// inteligencia orbital
+p.vx += -dy/dist*0.2;
+p.vy += dx/dist*0.2;
+}
+
+if(phase===3){
+// entidad agresiva
+p.vx += dx/dist*0.2;
+p.vy += dy/dist*0.2;
+p.vx += (Math.random()-0.5)*energy*0.05;
+p.vy += (Math.random()-0.5)*energy*0.05;
+}
+
+// influencia del mouse
+let mdx = mx - p.x;
+let mdy = my - p.y;
+let md = Math.hypot(mdx,mdy)+0.001;
+
+p.vx += mdx/md*0.05;
+p.vy += mdy/md*0.05;
+
+// audio
+p.vx += (Math.random()-0.5)*energy*0.02;
+p.vy += (Math.random()-0.5)*energy*0.02;
+
+// mover
+p.x += p.vx;
+p.y += p.vy;
+
+p.vx *= 0.93;
+p.vy *= 0.93;
+
+// color orgánico
+let r = 50 + energy*2;
+let g = 100 + Math.sin(p.life)*100;
+let b = 255;
+
+// glow
+ctx.beginPath();
+ctx.arc(p.x,p.y,1.5+energy*0.02,0,Math.PI*2);
+ctx.fillStyle=`rgb(${r},${g},${b})`;
+ctx.fill();
+
+p.life += 0.1;
+
+});
+
+// núcleo vivo
+let radius = 20 + energy*0.3;
+
+let grad = ctx.createRadialGradient(cx,cy,0,cx,cy,radius*5);
+grad.addColorStop(0,"rgba(0,200,255,0.8)");
+grad.addColorStop(1,"rgba(0,0,0,0)");
+
+ctx.fillStyle = grad;
+ctx.beginPath();
+ctx.arc(cx,cy,radius*5,0,Math.PI*2);
+ctx.fill();
+
+}
+animate();
+</script>
+
+</body>
+</html>
